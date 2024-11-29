@@ -18,7 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include <string.h>
+#include <stdio.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -59,12 +60,60 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define MAX_BUFFER_SIZE 30
+#define COMMAND_RST "!RST#"
+#define COMMAND_OK "!OK#"
 uint8_t temp = 0;
-
+uint8_t buffer[MAX_BUFFER_SIZE];
+uint8_t index_buffer = 0;
+uint8_t buffer_flag = 0;
+uint8_t command_flag = 0;
+uint32_t ADC_value = 0;
+char response[50];
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if ( huart -> Instance == USART2) {
-		HAL_UART_Transmit(&huart2, &temp, 1, 50);
+	if (huart->Instance == USART2) {
+		buffer[index_buffer++] = temp;
+		if (index_buffer == 30)
+			index_buffer = 0;
+		buffer_flag = 1;
 		HAL_UART_Receive_IT(&huart2, &temp, 1);
+		HAL_UART_Transmit(&huart2, &temp, 1, 1000);
+
+	}
+}
+void command_parser_fsm() {
+	if (strstr((char*) buffer, COMMAND_RST) != NULL) { // Kiểm tra !RST#
+		command_flag = 1;
+		memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer sau khi nhận lệnh
+		index_buffer = 0;
+	} else if (strstr((char*) buffer, COMMAND_OK) != NULL) { // Kiểm tra !OK#
+		command_flag = 2;
+		memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer sau khi nhận lệnh
+		index_buffer = 0;
+	}
+}
+void uart_communication_fsm() {
+	static uint32_t timeout_start = 0;
+	static uint8_t resend_flag = 0;
+
+	if (command_flag == 1) { // Xử lý lệnh !RST#
+		ADC_value = HAL_ADC_GetValue(&hadc1); // Đọc giá trị ADC
+		sprintf(response, "!ADC=%lu#\r\n", ADC_value);
+		HAL_UART_Transmit(&huart2, (uint8_t*) response, strlen(response), 1000);
+		timeout_start = HAL_GetTick(); // Ghi lại thời gian hiện tại
+		resend_flag = 1;
+		command_flag = 0;
+	}
+
+	if (resend_flag == 1) { // Kiểm tra timeout cho lệnh !OK#
+		if (command_flag == 2) { // Lệnh !OK# đã nhận
+			resend_flag = 0; // Ngừng gửi lại
+			command_flag = 0;
+		} else if (HAL_GetTick() - timeout_start > 3000) { // Quá 3 giây
+			HAL_UART_Transmit(&huart2, (uint8_t*) response, strlen(response),
+					1000); // Gửi lại
+			timeout_start = HAL_GetTick(); // Reset thời gian
+		}
 	}
 }
 /* USER CODE END 0 */
@@ -105,7 +154,27 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+	//uint32_t ADC_value = 0;
+	//char str[50]={1};
 	while (1) {
+
+		if (buffer_flag == 1) {
+			command_parser_fsm(); // Xử lý lệnh từ buffer
+			buffer_flag = 0;
+		}
+		uart_communication_fsm();
+		HAL_ADC_Start(&hadc1);
+		if (HAL_ADC_PollForConversion(&hadc1, 1000) == HAL_OK) {
+			ADC_value = HAL_ADC_GetValue(&hadc1);  // Lấy giá trị ADC
+		}
+
+		// Tạo chuỗi phản hồi theo định dạng !ADC=<ADC_value>#
+		sprintf(response, "!ADC=%lu#", ADC_value);
+
+		// Gửi chuỗi qua UART
+		HAL_UART_Transmit(&huart2, (uint8_t*) response, strlen(response), 1000);
+
+		HAL_Delay(500);  // Đợi một chút trước khi tiếp tục vòng lặp
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -233,11 +302,22 @@ static void MX_USART2_UART_Init(void) {
  * @retval None
  */
 static void MX_GPIO_Init(void) {
+	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
 	/* USER CODE BEGIN MX_GPIO_Init_1 */
 	/* USER CODE END MX_GPIO_Init_1 */
 
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOA_CLK_ENABLE();
+
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pin : LED_RED_Pin */
+	GPIO_InitStruct.Pin = LED_RED_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(LED_RED_GPIO_Port, &GPIO_InitStruct);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */
