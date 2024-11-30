@@ -61,8 +61,7 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 #define MAX_BUFFER_SIZE 30
-#define COMMAND_RST "!RST#"
-#define COMMAND_OK "!OK#"
+
 uint8_t temp = 0;
 uint8_t buffer[MAX_BUFFER_SIZE];
 uint8_t index_buffer = 0;
@@ -70,51 +69,62 @@ uint8_t buffer_flag = 0;
 uint8_t command_flag = 0;
 uint32_t ADC_value = 0;
 char response[50];
+
+// Hàm xử lý ngắt UART
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart->Instance == USART2) {
-		buffer[index_buffer++] = temp;
-		if (index_buffer == 30)
-			index_buffer = 0;
-		buffer_flag = 1;
-		HAL_UART_Receive_IT(&huart2, &temp, 1);
-		HAL_UART_Transmit(&huart2, &temp, 1, 1000);
+    if (huart->Instance == USART2) {
 
-	}
+        HAL_UART_Transmit(&huart2, &temp, 1, 1000);
+        buffer[index_buffer++ % MAX_BUFFER_SIZE] = temp; // Lưu byte nhận được vào buffer
+        buffer_flag = 1; // Đặt cờ báo hiệu buffer có dữ liệu mới
+        HAL_UART_Receive_IT(&huart2, &temp, 1); // Tiếp tục nhận dữ liệu
+    }
 }
+
+// Hàm phân tích lệnh trong buffer
 void command_parser_fsm() {
-	if (strstr((char*) buffer, COMMAND_RST) != NULL) { // Kiểm tra !RST#
-		command_flag = 1;
-		memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer sau khi nhận lệnh
-		index_buffer = 0;
-	} else if (strstr((char*) buffer, COMMAND_OK) != NULL) { // Kiểm tra !OK#
-		command_flag = 2;
-		memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer sau khi nhận lệnh
-		index_buffer = 0;
-	}
+
+    if (strstr((char *)buffer, "!RST#")) {
+        command_flag = 1; // Đặt cờ nhận lệnh !RST#
+        memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer
+        index_buffer = 0;
+    }
+    // Tìm chuỗi lệnh !OK#
+    else if (strstr((char *)buffer, "!OK#")) {
+        command_flag = 2; // Đặt cờ nhận lệnh !OK#
+        memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer
+        index_buffer = 0;
+    }
 }
+
+// FSM quản lý giao tiếp UART
 void uart_communication_fsm() {
-	static uint32_t timeout_start = 0;
-	static uint8_t resend_flag = 0;
+    static uint32_t last_send_time = 0; // Thời gian lần cuối gửi giá trị
+    static uint8_t send_enabled = 0;   // Cờ cho phép gửi giá trị ADC
 
-	if (command_flag == 1) { // Xử lý lệnh !RST#
-		ADC_value = HAL_ADC_GetValue(&hadc1); // Đọc giá trị ADC
-		sprintf(response, "!ADC=%lu#\r\n", ADC_value);
-		HAL_UART_Transmit(&huart2, (uint8_t*) response, strlen(response), 1000);
-		timeout_start = HAL_GetTick(); // Ghi lại thời gian hiện tại
-		resend_flag = 1;
-		command_flag = 0;
-	}
+    if (command_flag == 1) { // Khi nhận lệnh !RST#
+        send_enabled = 1;   // Bật chế độ gửi giá trị ADC
+        command_flag = 0;   // Reset cờ
+    }
 
-	if (resend_flag == 1) { // Kiểm tra timeout cho lệnh !OK#
-		if (command_flag == 2) { // Lệnh !OK# đã nhận
-			resend_flag = 0; // Ngừng gửi lại
-			command_flag = 0;
-		} else if (HAL_GetTick() - timeout_start > 3000) { // Quá 3 giây
-			HAL_UART_Transmit(&huart2, (uint8_t*) response, strlen(response),
-					1000); // Gửi lại
-			timeout_start = HAL_GetTick(); // Reset thời gian
-		}
-	}
+    if (command_flag == 2) { // Khi nhận lệnh !OK#
+        send_enabled = 0;   // Tắt chế độ gửi giá trị ADC
+        command_flag = 0;   // Reset cờ
+    }
+
+    if (send_enabled) { // Nếu chế độ gửi giá trị ADC đang bật
+        // Gửi giá trị ADC sau mỗi 3 giây
+        if (HAL_GetTick() - last_send_time >= 3000) {
+            HAL_ADC_Start(&hadc1);
+            if (HAL_ADC_PollForConversion(&hadc1, 1000) == HAL_OK) {
+                ADC_value = HAL_ADC_GetValue(&hadc1); // Lấy giá trị ADC mới nhất
+            }
+            // Tạo chuỗi phản hồi theo định dạng !ADC=<ADC_value>#
+            sprintf(response, "!ADC=%lu#\r\n", ADC_value);
+            HAL_UART_Transmit(&huart2, (uint8_t *)response, strlen(response), 1000); // Gửi qua UART
+            last_send_time = HAL_GetTick(); // Cập nhật thời gian lần cuối gửi
+        }
+    }
 }
 /* USER CODE END 0 */
 
@@ -163,18 +173,7 @@ int main(void) {
 			buffer_flag = 0;
 		}
 		uart_communication_fsm();
-		HAL_ADC_Start(&hadc1);
-		if (HAL_ADC_PollForConversion(&hadc1, 1000) == HAL_OK) {
-			ADC_value = HAL_ADC_GetValue(&hadc1);  // Lấy giá trị ADC
-		}
 
-		// Tạo chuỗi phản hồi theo định dạng !ADC=<ADC_value>#
-		sprintf(response, "!ADC=%lu#", ADC_value);
-
-		// Gửi chuỗi qua UART
-		HAL_UART_Transmit(&huart2, (uint8_t*) response, strlen(response), 1000);
-
-		HAL_Delay(500);  // Đợi một chút trước khi tiếp tục vòng lặp
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
