@@ -18,11 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include <string.h>
-#include <stdio.h>
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include"timer.h"
+#include<stdio.h>
+//#include<string.h>
+#include <command_parser_fsm.h>
+#include <uart_communication_fsm.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,6 +46,8 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -54,78 +59,82 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MAX_BUFFER_SIZE 30
-
-uint8_t temp = 0;
-uint8_t buffer[MAX_BUFFER_SIZE];
-uint8_t index_buffer = 0;
-uint8_t buffer_flag = 0;
-uint8_t command_flag = 0;
-uint32_t ADC_value = 0;
-char response[50];
-
-// Hàm xử lý ngắt UART
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART2) {
-
-        HAL_UART_Transmit(&huart2, &temp, 1, 1000);
-        buffer[index_buffer++ % MAX_BUFFER_SIZE] = temp; // Lưu byte nhận được vào buffer
-        buffer_flag = 1; // Đặt cờ báo hiệu buffer có dữ liệu mới
-        HAL_UART_Receive_IT(&huart2, &temp, 1); // Tiếp tục nhận dữ liệu
-    }
-}
-
-// Hàm phân tích lệnh trong buffer
-void command_parser_fsm() {
-
-    if (strstr((char *)buffer, "!RST#")) {
-        command_flag = 1; // Đặt cờ nhận lệnh !RST#
-        memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer
-        index_buffer = 0;
-    }
-    // Tìm chuỗi lệnh !OK#
-    else if (strstr((char *)buffer, "!OK#")) {
-        command_flag = 2; // Đặt cờ nhận lệnh !OK#
-        memset(buffer, 0, MAX_BUFFER_SIZE); // Xóa buffer
-        index_buffer = 0;
-    }
-}
-
-// FSM quản lý giao tiếp UART
-void uart_communication_fsm() {
-    static uint32_t last_send_time = 0; // Thời gian lần cuối gửi giá trị
-    static uint8_t send_enabled = 0;   // Cờ cho phép gửi giá trị ADC
-
-    if (command_flag == 1) { // Khi nhận lệnh !RST#
-        send_enabled = 1;   // Bật chế độ gửi giá trị ADC
-        command_flag = 0;   // Reset cờ
-    }
-
-    if (command_flag == 2) { // Khi nhận lệnh !OK#
-        send_enabled = 0;   // Tắt chế độ gửi giá trị ADC
-        command_flag = 0;   // Reset cờ
-    }
-
-    if (send_enabled) { // Nếu chế độ gửi giá trị ADC đang bật
-        // Gửi giá trị ADC sau mỗi 3 giây
-        if (HAL_GetTick() - last_send_time >= 3000) {
-            HAL_ADC_Start(&hadc1);
-            if (HAL_ADC_PollForConversion(&hadc1, 1000) == HAL_OK) {
-                ADC_value = HAL_ADC_GetValue(&hadc1); // Lấy giá trị ADC mới nhất
-            }
-            // Tạo chuỗi phản hồi theo định dạng !ADC=<ADC_value>#
-            sprintf(response, "!ADC=%lu#\r\n", ADC_value);
-            HAL_UART_Transmit(&huart2, (uint8_t *)response, strlen(response), 1000); // Gửi qua UART
-            last_send_time = HAL_GetTick(); // Cập nhật thời gian lần cuối gửi
-        }
-    }
-}
+//#define MAX_BUFFER_SIZE 30
+//
+//uint8_t temp = 0;
+//uint8_t buffer[MAX_BUFFER_SIZE];
+//uint8_t index_buffer = 0;
+//uint8_t buffer_flag = 0;
+//uint8_t command_flag = 0;
+//uint8_t send_enabled = 0;
+//uint32_t ADC_value = 0;
+//char response[50];
+//
+//// Hàm xử lý ngắt UART
+//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+//    if (huart->Instance == USART2) {
+//
+//        HAL_UART_Transmit(&huart2, &temp, 1, 1000);
+//        buffer[index_buffer++ % MAX_BUFFER_SIZE] = temp;
+//        buffer_flag = 1;
+//        HAL_UART_Receive_IT(&huart2, &temp, 1);
+//    }
+//}
+//
+//
+//void command_parser_fsm() {
+//
+//    if (strstr((char *)buffer, "!RST#")) {
+//        command_flag = 1;
+//        memset(buffer, 0, MAX_BUFFER_SIZE);
+//        index_buffer = 0;
+//    }
+//
+//    else if (strstr((char *)buffer, "!OK#")) {
+//        command_flag = 2;
+//        memset(buffer, 0, MAX_BUFFER_SIZE);
+//        index_buffer = 0;
+//    }
+//}
+//
+//
+//void uart_communication_fsm() {
+//
+//
+//
+//    if (command_flag == 1) {
+//        send_enabled = 1;
+//        setTimer(0, 300);
+//        command_flag = 0;
+//    }
+//
+//    if (command_flag == 2) {
+//        send_enabled = 0;
+//        setTimer(0, 300);
+//        command_flag = 0;
+//    }
+//
+//    if (send_enabled) {
+//
+//        if (isTimerExpired(0)) {
+//            HAL_ADC_Start(&hadc1);
+//            if (HAL_ADC_PollForConversion(&hadc1, 1000) == HAL_OK) {
+//                ADC_value = HAL_ADC_GetValue(&hadc1);
+//            }
+//
+//            sprintf(response, "!ADC=%lu#\r\n", ADC_value);
+//            HAL_UART_Transmit(&huart2, (uint8_t *)response, strlen(response), 1000);
+//
+//        }
+//    }
+//}
 /* USER CODE END 0 */
 
 /**
@@ -158,21 +167,31 @@ int main(void) {
 	MX_GPIO_Init();
 	MX_ADC1_Init();
 	MX_USART2_UART_Init();
+	MX_TIM2_Init();
 	/* USER CODE BEGIN 2 */
-	HAL_UART_Receive_IT(&huart2, &temp, 1);
+//	HAL_UART_Receive_IT(&huart2, &temp, 1);
+	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_ADC_Start(&hadc1);
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	//uint32_t ADC_value = 0;
 	//char str[50]={1};
-	while (1) {
 
-		if (buffer_flag == 1) {
-			command_parser_fsm(); // Xử lý lệnh từ buffer
-			buffer_flag = 0;
+	command_parser_init();
+	while (1) {
+		/* USER CODE END WHILE */
+
+		/* USER CODE BEGIN 3 */
+		if (getBufferFlag() == 1) {
+			command_parser_fsm();
+			setBufferFlag(0);
 		}
+		;
 		uart_communication_fsm();
+
+
 
 		/* USER CODE END WHILE */
 
@@ -265,6 +284,48 @@ static void MX_ADC1_Init(void) {
 }
 
 /**
+ * @brief TIM2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM2_Init(void) {
+
+	/* USER CODE BEGIN TIM2_Init 0 */
+
+	/* USER CODE END TIM2_Init 0 */
+
+	TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+	TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+
+	/* USER CODE BEGIN TIM2_Init 1 */
+
+	/* USER CODE END TIM2_Init 1 */
+	htim2.Instance = TIM2;
+	htim2.Init.Prescaler = 7999;
+	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim2.Init.Period = 9;
+	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+	if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
+		Error_Handler();
+	}
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+	if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN TIM2_Init 2 */
+
+	/* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
  * @brief USART2 Initialization Function
  * @param None
  * @retval None
@@ -309,21 +370,24 @@ static void MX_GPIO_Init(void) {
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOA, LED_RED_Pin | GPIO_PIN_6, GPIO_PIN_RESET);
 
-	/*Configure GPIO pin : LED_RED_Pin */
-	GPIO_InitStruct.Pin = LED_RED_Pin;
+	/*Configure GPIO pins : LED_RED_Pin PA6 */
+	GPIO_InitStruct.Pin = LED_RED_Pin | GPIO_PIN_6;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(LED_RED_GPIO_Port, &GPIO_InitStruct);
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
+	timerRun();
+}
 /* USER CODE END 4 */
 
 /**

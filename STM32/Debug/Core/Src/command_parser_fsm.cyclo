@@ -1,0 +1,9 @@
+../Core/Src/command_parser_fsm.c:14:6:command_parser_init	1
+../Core/Src/command_parser_fsm.c:18:9:getReqFlag	1
+../Core/Src/command_parser_fsm.c:22:6:setReqFlag	1
+../Core/Src/command_parser_fsm.c:26:9:getOKFlag	1
+../Core/Src/command_parser_fsm.c:30:6:setOKFlag	1
+../Core/Src/command_parser_fsm.c:34:9:getBufferFlag	1
+../Core/Src/command_parser_fsm.c:38:6:setBufferFlag	1
+../Core/Src/command_parser_fsm.c:42:6:HAL_UART_RxCpltCallback	3
+../Core/Src/command_parser_fsm.c:53:6:command_parser_fsm	24

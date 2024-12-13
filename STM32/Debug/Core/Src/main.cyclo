@@ -1,9 +1,8 @@
-../Core/Src/main.c:74:6:HAL_UART_RxCpltCallback	2
-../Core/Src/main.c:85:6:command_parser_fsm	3
-../Core/Src/main.c:101:6:uart_communication_fsm	6
-../Core/Src/main.c:135:5:main	2
-../Core/Src/main.c:188:6:SystemClock_Config	4
-../Core/Src/main.c:228:13:MX_ADC1_Init	3
-../Core/Src/main.c:272:13:MX_USART2_UART_Init	2
-../Core/Src/main.c:303:13:MX_GPIO_Init	1
-../Core/Src/main.c:333:6:Error_Handler	1
+../Core/Src/main.c:144:5:main	2
+../Core/Src/main.c:207:6:SystemClock_Config	4
+../Core/Src/main.c:247:13:MX_ADC1_Init	3
+../Core/Src/main.c:291:13:MX_TIM2_Init	4
+../Core/Src/main.c:333:13:MX_USART2_UART_Init	2
+../Core/Src/main.c:364:13:MX_GPIO_Init	1
+../Core/Src/main.c:387:6:HAL_TIM_PeriodElapsedCallback	1
+../Core/Src/main.c:397:6:Error_Handler	1

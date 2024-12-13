@@ -32,7 +32,7 @@
      <ITEM name="nItems">0</ITEM>
     </PROPERTIES>
    </POPUP>
-   <POPUP w="450" x="398" flags="00000022" y="323" h="250" pid="0" iid="3">
+   <POPUP w="450" x="1215" flags="00008023" y="302" h="250" pid="0" iid="3">
     <PROPERTIES>
      <ITEM name="AutoEcho">0</ITEM>
      <ITEM name="HexMode">0</ITEM>
@@ -340,13 +340,15 @@
    </POPUP>
    <POPUP w="600" x="708" flags="0000002a" y="620" h="400" pid="100" iid="1">
     <PROPERTIES>
+     <ITEM name="Breakpoint 0">"",800011E,0000,0C2C,9A48,1387279080
+</ITEM>
      <ITEM name="CaseSensitive">No</ITEM>
      <ITEM name="DISPADDRS">Yes</ITEM>
      <ITEM name="DISPLNUMS">No</ITEM>
      <ITEM name="DISPOPCODES">No</ITEM>
      <ITEM name="FIXUPBPTS">Yes</ITEM>
      <ITEM name="WordsOnly">No</ITEM>
-     <ITEM name="nBreakpoints">0</ITEM>
+     <ITEM name="nBreakpoints">1</ITEM>
     </PROPERTIES>
    </POPUP>
    <POPUP w="300" x="728" flags="0000000a" y="720" h="300" pid="101" iid="1">
